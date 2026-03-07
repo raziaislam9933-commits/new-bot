@@ -1,7 +1,7 @@
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
-const EVENTS_URL = "https://noisy-mountain-8f1a.mominulislamm3u8.workers.dev/?url=https://cfygsjskhdk102.top/categories/live-events.txt";
+const EVENTS_URL = "https://noisy-mountain-8f1a.mominulislamm3u8.workers.dev/?url=https://cfygsjskhdk102.top/categories/live-events.txt&enrich=1";
 const NOTIFY_BEFORE_START_MS = 10 * 60 * 1000;
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
