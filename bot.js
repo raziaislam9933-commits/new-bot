@@ -43,7 +43,6 @@ async function checkAndNotify() {
 
   for (const event of activeEvents) {
     console.log(`\n--- Processing: ${event.title} ---`);
-    console.log(`   channelUrl: ${event.channelUrl}`);
 
     if (!event.channelUrl) {
       console.log(`   ⚠️  No channelUrl, skipping`);
@@ -51,29 +50,21 @@ async function checkAndNotify() {
     }
 
     try {
-      // Strip proxy wrapper if present
-      let channelUrl = event.channelUrl;
-      const match = channelUrl.match(/[?&]url=([^&]+)/);
-      if (match) {
-        channelUrl = decodeURIComponent(match[1]);
-        console.log(`   → Extracted direct URL: ${channelUrl}`);
-      }
-
-      const streamData = await fetchJSON(channelUrl);
-      console.log(`   Stream keys: ${Object.keys(streamData).join(", ")}`);
+      // Always use the channelUrl AS-IS (proxy decrypts the response)
+      console.log(`   🔗 Fetching: ${event.channelUrl}`);
+      const streamData = await fetchJSON(event.channelUrl);
 
       if (!streamData?.streamUrls?.length) {
-        console.log(`   ⚠️  streamUrls is empty or missing`);
-        console.log(`   Raw streamData: ${JSON.stringify(streamData).slice(0, 300)}`);
+        console.log(`   ⚠️  No streamUrls found`);
+        console.log(`   Raw: ${JSON.stringify(streamData).slice(0, 200)}`);
         continue;
       }
 
       console.log(`   ✅ Found ${streamData.streamUrls.length} stream(s)`);
       const message = buildMessage(event, streamData);
 
-      console.log(`   📤 Sending to Telegram channel: ${CHANNEL_ID}`);
       const result = await sendTelegramMessage(message);
-      console.log(`   ✅ Sent! Message ID: ${result.result?.message_id}`);
+      console.log(`   📤 Sent! Message ID: ${result.result?.message_id}`);
 
       await sleep(1000);
     } catch (e) {
@@ -164,7 +155,7 @@ if (!BOT_TOKEN || !CHANNEL_ID) {
 
 console.log("🤖 Sports Bot started!");
 console.log(`⏱️  Checking every ${CHECK_INTERVAL_MS / 60000} minutes`);
-console.log(`📢 Sending to channel: ${CHANNEL_ID}`);
+console.log(`📢 Sending to: ${CHANNEL_ID}`);
 
 checkAndNotify();
 setInterval(checkAndNotify, CHECK_INTERVAL_MS);
