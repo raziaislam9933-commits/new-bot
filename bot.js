@@ -5,6 +5,9 @@ const EVENTS_URL = "https://noisy-mountain-8f1a.mominulislamm3u8.workers.dev/?ur
 const NOTIFY_BEFORE_START_MS = 10 * 60 * 1000;
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+// In-memory store of already-notified event IDs (persists until bot restarts)
+const notifiedEvents = new Set();
+
 async function fetchJSON(url) {
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
@@ -41,7 +44,27 @@ async function checkAndNotify() {
 
   console.log(`📅 Active/upcoming events: ${activeEvents.length}`);
 
+  // Clean up notifiedEvents for events that have ended (avoid memory bloat)
+  for (const id of notifiedEvents) {
+    const event = events.find((e) => String(e.id) === id);
+    if (event?.eventInfo?.endTime) {
+      const end = new Date(event.eventInfo.endTime).getTime();
+      if (now > end) {
+        notifiedEvents.delete(id);
+        console.log(`🗑️  Cleared expired event ID: ${id}`);
+      }
+    }
+  }
+
   for (const event of activeEvents) {
+    const eventId = String(event.id);
+
+    // Skip if already notified
+    if (notifiedEvents.has(eventId)) {
+      console.log(`⏭️  Already notified: ${event.title} (ID: ${eventId})`);
+      continue;
+    }
+
     console.log(`\n--- Processing: ${event.title} ---`);
 
     if (!event.channelUrl) {
@@ -50,13 +73,11 @@ async function checkAndNotify() {
     }
 
     try {
-      // Always use the channelUrl AS-IS (proxy decrypts the response)
       console.log(`   🔗 Fetching: ${event.channelUrl}`);
       const streamData = await fetchJSON(event.channelUrl);
 
       if (!streamData?.streamUrls?.length) {
         console.log(`   ⚠️  No streamUrls found`);
-        console.log(`   Raw: ${JSON.stringify(streamData).slice(0, 200)}`);
         continue;
       }
 
@@ -65,6 +86,9 @@ async function checkAndNotify() {
 
       const result = await sendTelegramMessage(message);
       console.log(`   📤 Sent! Message ID: ${result.result?.message_id}`);
+
+      // Mark as notified so it won't be sent again
+      notifiedEvents.add(eventId);
 
       await sleep(1000);
     } catch (e) {
@@ -103,9 +127,10 @@ function buildMessage(event, streamData) {
     msg += `   📺 Type: ${typeLabel}\n`;
     msg += `   🔗 Link:\n\`${stream.link}\`\n`;
     if (stream.api) {
-      const [key, iv] = stream.api.split(":");
+      // Format: "key:keyID" → Key: key, Key ID: keyID
+      const [key, keyId] = stream.api.split(":");
       msg += `   🔑 Key: \`${key}\`\n`;
-      if (iv) msg += `   🔐 IV:  \`${iv}\`\n`;
+      if (keyId) msg += `   🪪 Key ID: \`${keyId}\`\n`;
     }
     if (stream.webLink) msg += `   🌐 Web: ${stream.webLink}\n`;
     msg += "\n";
